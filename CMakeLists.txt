@@ -23,7 +23,7 @@ find_package(plansys2_problem_expert REQUIRED)
 add_executable(get_plan src/getplan.cpp)
 add_executable(get_plan_and_execute src/getplan_and_execute.cpp)
 add_executable(rotation_action_node src/rotation_action_node.cpp)
-add_executable(move_action_node src/move_action_node.cpp)
+add_executable(move_to_waypoint_action src/move_to_waypoint_action.cpp)
 
 ament_target_dependencies(get_plan
     rclcpp
@@ -53,7 +53,7 @@ ament_target_dependencies(rotation_action_node
     geometry_msgs
     nav2_msgs
 )
-ament_target_dependencies(move_action_node
+ament_target_dependencies(move_to_waypoint_action
     rclcpp
     rclcpp_action
     plansys2_executor
@@ -69,7 +69,7 @@ install(DIRECTORY
 )
 
 install(TARGETS
-  get_plan get_plan_and_execute rotation_action_node move_action_node 
+  get_plan get_plan_and_execute rotation_action_node move_to_waypoint_action 
   DESTINATION lib/${PROJECT_NAME}
 )
 

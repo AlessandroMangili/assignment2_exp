@@ -16,10 +16,9 @@ using namespace std::chrono_literals;
 class MoveAction : public plansys2::ActionExecutorClient
 {
 public:
-  MoveAction()
-  : plansys2::ActionExecutorClient("move", 500ms), goal_sent_(false), progress_(0.0)
+  MoveAction() : plansys2::ActionExecutorClient("move_to_waypoint", 500ms)//, goal_sent_(false), progress_(0.0) 
   {
-    odom_ = this->create_subscription<nav_msgs::msg::Odometry>(
+    /*odom_ = this->create_subscription<nav_msgs::msg::Odometry>(
       "/odom", 10,
       std::bind(&MoveAction::odom_callback, this, std::placeholders::_1)
     );
@@ -27,13 +26,14 @@ public:
     nav2_node_ = rclcpp::Node::make_shared("move_action_nav2_client");
     nav2_client_ = rclcpp_action::create_client<nav2_msgs::action::NavigateToPose>(
       nav2_node_, "navigate_to_pose"
-    );
+    );*/
+    progress_ = 0.0;
   }
 
 private:
   void do_work() override
   {
-    auto args = get_arguments();
+    /*auto args = get_arguments();
     if (args.size() < 3) {
       RCLCPP_ERROR(get_logger(), "Not enough arguments for move action");
       finish(false, 0.0, "Insufficient arguments");
@@ -99,9 +99,10 @@ private:
       send_feedback(progress_, "Moving to " + wp_to_navigate);
       RCLCPP_INFO(get_logger(), "Reached waypoint: %s", wp_to_navigate.c_str());
       finish(true, 1.0, "Move completed");
-    }
+    }*/
 
-    rclcpp::spin_some(nav2_node_);
+    finish(true, 1.0, "Move completed");
+    //rclcpp::spin_some(nav2_node_);
   }
 
   void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg)
@@ -125,9 +126,8 @@ int main(int argc, char ** argv)
   rclcpp::init(argc, argv);
   auto node = std::make_shared<MoveAction>();
 
-  node->set_parameter(rclcpp::Parameter("action_name", "move"));
+  node->set_parameter(rclcpp::Parameter("action_name", "move_to_waypoint"));
   node->trigger_transition(lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE);
-  node->trigger_transition(lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE);
 
   rclcpp::spin(node->get_node_base_interface());
 

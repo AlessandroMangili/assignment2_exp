@@ -21,7 +21,7 @@
     )
 
     ;; Actions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    (:action move
+    (:action move_to_waypoint
         :parameters (?r - robot ?wp1 - waypoint ?wp2 - waypoint)
         :precondition (and 
             (robot_at ?r ?wp1)
