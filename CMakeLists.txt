@@ -14,9 +14,64 @@ find_package(nav2_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(lifecycle_msgs REQUIRED)
 find_package(plansys2_executor REQUIRED)
+find_package(plansys2_pddl_parser REQUIRED)
+find_package(plansys2_msgs REQUIRED)
+find_package(plansys2_domain_expert REQUIRED)
+find_package(plansys2_planner REQUIRED)
+find_package(plansys2_problem_expert REQUIRED)
 
-add_executable(rotation src/rotation.cpp)
-add_executable(move src/move.cpp)
+add_executable(get_plan src/getplan.cpp)
+add_executable(get_plan_and_execute src/getplan_and_execute.cpp)
+add_executable(rotation src/rotation_action_node.cpp)
+add_executable(move src/move_action_node.cpp)
+
+ament_target_dependencies(get_plan
+    rclcpp
+    plansys2_pddl_parser
+    plansys2_msgs
+    plansys2_domain_expert
+    plansys2_planner
+    plansys2_problem_expert
+)
+
+ament_target_dependencies(get_plan_and_execute
+    rclcpp
+    plansys2_pddl_parser
+    plansys2_msgs
+    plansys2_domain_expert
+    plansys2_planner
+    plansys2_problem_expert
+    plansys2_executor
+    rclcpp_action
+)
+
+ament_target_dependencies(rotation
+    rclcpp
+    rclcpp_action
+    plansys2_executor
+    plansys2_msgs
+    geometry_msgs
+        nav2_msgs
+)
+ament_target_dependencies(move
+    rclcpp
+    rclcpp_action
+    plansys2_executor
+    plansys2_msgs
+    geometry_msgs
+    nav2_msgs
+)
+
+install(DIRECTORY
+  domain
+  launch
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(TARGETS
+  get_plan get_plan_and_execute rotation move 
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

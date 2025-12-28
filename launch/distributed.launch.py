@@ -20,13 +20,13 @@ def generate_launch_description():
     
     declare_model_file_cmd = DeclareLaunchArgument(
         'model_file',
-        default_value=os.path.join(interface_dir, "domain", "assignmnet2_domain.pddl"),
+        default_value=os.path.join(interface_dir, "domain", "assignment2_domain.pddl"),
         description='PDDL Model file'
     )
 
     declare_problem_file_cmd = DeclareLaunchArgument(
         'problem_file', 
-        default_value=os.path.join(interface_dir, "domain", "assignmnet2_problem.pddl"),
+        default_value=os.path.join(interface_dir, "domain", "assignment2_problem.pddl"),
         description='PDDL Problem file')
         
     declare_namespace_cmd = DeclareLaunchArgument(

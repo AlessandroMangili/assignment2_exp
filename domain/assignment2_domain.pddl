@@ -1,5 +1,5 @@
 (define (domain simple)
-    (:requirements :strips :typing :adl :fluents)
+    (:requirements :strips :typing :adl :fluents :durative-actions)
 
     ;; Types ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     (:types
@@ -7,15 +7,11 @@
         waypoint
     )
 
-
-    (:constants
-        starting_position - waypoint
-    )
-
     ;; Predicates ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     (:predicates
         (robot_at ?r - robot ?wp - waypoint)
         (not_robot_at ?r - robot ?wp - waypoint)
+        (finished ?r - robot)
     )
 
     ;; Functions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -25,23 +21,40 @@
     )
 
     ;; Actions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    (:action move
-        :parameters (?r - robot ?wp1 ?wp2 - waypoint)
-        :precondition (and (robot_at ?r ?wp1) (not_robot_at ?r ?wp2) (< (spotted_waypoint ?wp2) 1))
+    (:durative-action move
+        :parameters (?r - robot ?wp1 - waypoint ?wp2 - waypoint)
+        :duration ( = ?duration 5)
+        :condition (and 
+            (at start(robot_at ?r ?wp1))
+            (at start(not_robot_at ?r ?wp2))
+            (at start(< (spotted_waypoint ?wp2) 1))
+        )
         :effect (and 
-            (robot_at ?r ?wp2)
-            (not (not_robot_at ?r ?wp2))
-            (not (robot_at ?r ?wp1))
-            (not_robot_at ?r ?wp1)
+            (at end(robot_at ?r ?wp2))
+            (at end(not (not_robot_at ?r ?wp2)))
+            (at end(not (robot_at ?r ?wp1)))
+            (at end(not_robot_at ?r ?wp1))
         )
     )
 
-    (:action rotation
+    (:durative-action rotation
         :parameters (?r - robot ?wp - waypoint)
-        :precondition (and (robot_at ?r ?wp) (< (spotted_waypoint ?wp) 1))
+        :duration ( = ?duration 5)
+        :condition (and 
+            (at start(robot_at ?r ?wp))
+            (at start(< (spotted_waypoint ?wp) 1))
+        )
         :effect (and
-            (increase (spotted_waypoint ?wp) 1)
-            (increase (reached_goals ?r) 1)
+            (at start(increase (spotted_waypoint ?wp) 1))
+            (at end(increase (reached_goals ?r) 1))
+        )
+    )
+
+    (:action checks_end
+        :parameters (?r - robot)
+        :precondition (>= (reached_goals ?r) 4)
+        :effect (and
+            (finished ?r)
         )
     )
 )
