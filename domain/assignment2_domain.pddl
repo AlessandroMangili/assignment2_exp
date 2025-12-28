@@ -21,32 +21,30 @@
     )
 
     ;; Actions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    (:durative-action move
+    (:action move
         :parameters (?r - robot ?wp1 - waypoint ?wp2 - waypoint)
-        :duration ( = ?duration 5)
-        :condition (and 
-            (at start(robot_at ?r ?wp1))
-            (at start(not_robot_at ?r ?wp2))
-            (at start(< (spotted_waypoint ?wp2) 1))
+        :precondition (and 
+            (robot_at ?r ?wp1)
+            (not_robot_at ?r ?wp2)
+            (< (spotted_waypoint ?wp2) 1)
         )
         :effect (and 
-            (at end(robot_at ?r ?wp2))
-            (at end(not (not_robot_at ?r ?wp2)))
-            (at end(not (robot_at ?r ?wp1)))
-            (at end(not_robot_at ?r ?wp1))
+            (robot_at ?r ?wp2)
+            (not (not_robot_at ?r ?wp2))
+            (not (robot_at ?r ?wp1))
+            (not_robot_at ?r ?wp1)
         )
     )
 
-    (:durative-action rotation
+    (:action rotation
         :parameters (?r - robot ?wp - waypoint)
-        :duration ( = ?duration 5)
-        :condition (and 
-            (at start(robot_at ?r ?wp))
-            (at start(< (spotted_waypoint ?wp) 1))
+        :precondition (and 
+            (robot_at ?r ?wp)
+            (< (spotted_waypoint ?wp) 1)
         )
         :effect (and
-            (at start(increase (spotted_waypoint ?wp) 1))
-            (at end(increase (reached_goals ?r) 1))
+            (increase (spotted_waypoint ?wp) 1)
+            (increase (reached_goals ?r) 1)
         )
     )
 
