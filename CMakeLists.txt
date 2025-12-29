@@ -20,6 +20,10 @@ find_package(plansys2_domain_expert REQUIRED)
 find_package(plansys2_planner REQUIRED)
 find_package(plansys2_problem_expert REQUIRED)
 
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+
 add_executable(get_plan src/getplan.cpp)
 add_executable(get_plan_and_execute src/getplan_and_execute.cpp)
 add_executable(rotation_action_node src/rotation_action_node.cpp)
@@ -61,6 +65,9 @@ ament_target_dependencies(move_to_waypoint_action
     plansys2_msgs
     geometry_msgs
     nav2_msgs
+    tf2
+    tf2_ros
+    tf2_geometry_msgs
 )
 
 ament_target_dependencies(check_end_action_node

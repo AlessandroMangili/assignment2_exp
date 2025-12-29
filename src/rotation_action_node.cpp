@@ -14,21 +14,33 @@ using namespace std::chrono_literals;
 class Rotation : public plansys2::ActionExecutorClient {
     public:
         Rotation(): plansys2::ActionExecutorClient("rotation", 100ms) {
-            odom_sub = this->create_subscription<nav_msgs::msg::Odometry>("/odom", 100, std::bind(&Rotation::odom_callback, this, std::placeholders::_1));
+            odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(
+                "/odom", 
+                100, 
+                std::bind(&Rotation::odom_callback, this, std::placeholders::_1)
+            );
             vel_pub = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
             progress_ = 0.0;
             yaw = std::numeric_limits<float>::quiet_NaN();
         }
 
     private:
-            float progress_;
-            float yaw;
-            rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub;
-            rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr vel_pub;
+        float progress_;
+        float yaw;
+        rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub;
+        rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr vel_pub;
 
         void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
             const auto & q = msg->pose.pose.orientation;
             yaw = quaternion_to_yaw(q.x, q.y, q.z, q.w);
+        }
+
+        double quaternion_to_yaw(double x, double y, double z, double w) {
+            return std::atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z));
+        }
+
+        double normalize_angle(double angle) {
+            return std::atan2(std::sin(angle), std::cos(angle));
         }
         
         void do_work() override {
@@ -52,7 +64,7 @@ class Rotation : public plansys2::ActionExecutorClient {
             }
 
             geometry_msgs::msg::Twist twist;
-            twist.angular.z = 2;
+            twist.angular.z = 0.5;
             vel_pub->publish(twist);
 
             float delta = normalize_angle(yaw - last_yaw);
@@ -76,14 +88,6 @@ class Rotation : public plansys2::ActionExecutorClient {
 
                 RCLCPP_INFO(this->get_logger(), "ROTATION COMPLETED!");
             }
-        }
-
-        double quaternion_to_yaw(double x, double y, double z, double w) {
-            return std::atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z));
-        }
-
-        double normalize_angle(double angle) {
-            return std::atan2(std::sin(angle), std::cos(angle));
         }
 };
 
