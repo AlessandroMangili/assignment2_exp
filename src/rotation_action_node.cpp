@@ -52,7 +52,7 @@ class Rotation : public plansys2::ActionExecutorClient {
             }
 
             geometry_msgs::msg::Twist twist;
-            twist.angular.z = 0.25;
+            twist.angular.z = 2;
             vel_pub->publish(twist);
 
             float delta = normalize_angle(yaw - last_yaw);

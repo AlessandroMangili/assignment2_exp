@@ -17,10 +17,7 @@ class Check : public plansys2::ActionExecutorClient {
         void do_work() override {
             finish(true, 1.0, "Checked completed");
             progress_ = 0.0;
-
-            std::cout << "\r\e[K" << std::flush;
-            std::cout << "Requesting for ending ... [" << std::min(100.0, progress_ * 100.0) << "%]  " <<
-            std::flush;
+            RCLCPP_INFO(this->get_logger(), "END COMPLETED!");
         }
 
         float progress_;
