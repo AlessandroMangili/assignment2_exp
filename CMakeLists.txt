@@ -24,6 +24,7 @@ add_executable(get_plan src/getplan.cpp)
 add_executable(get_plan_and_execute src/getplan_and_execute.cpp)
 add_executable(rotation_action_node src/rotation_action_node.cpp)
 add_executable(move_to_waypoint_action src/move_to_waypoint_action.cpp)
+add_executable(check_end_action_node src/check_end_action_node.cpp)
 
 ament_target_dependencies(get_plan
     rclcpp
@@ -62,6 +63,13 @@ ament_target_dependencies(move_to_waypoint_action
     nav2_msgs
 )
 
+ament_target_dependencies(check_end_action_node
+    rclcpp
+    rclcpp_action
+    plansys2_executor
+    plansys2_msgs
+)
+
 install(DIRECTORY
   domain
   launch
@@ -69,7 +77,7 @@ install(DIRECTORY
 )
 
 install(TARGETS
-  get_plan get_plan_and_execute rotation_action_node move_to_waypoint_action 
+  get_plan get_plan_and_execute rotation_action_node move_to_waypoint_action check_end_action_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
