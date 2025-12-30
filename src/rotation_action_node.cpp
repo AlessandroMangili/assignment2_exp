@@ -8,6 +8,7 @@
 #include "geometry_msgs/msg/twist.hpp"
 
 #include "plansys2_executor/ActionExecutorClient.hpp"
+//#include "your_package/msg/aruco_detection.hpp"
 
 using namespace std::chrono_literals;
 
@@ -19,9 +20,18 @@ class Rotation : public plansys2::ActionExecutorClient {
                 100, 
                 std::bind(&Rotation::odom_callback, this, std::placeholders::_1)
             );
+            /*markers_sub_ = this->create_subscription<your_package::msg::ArucoDetection>(
+                "/aruco_detections",
+                100,
+                std::bind(&YourNodeClass::marker_detection, this, std::placeholders::_1)
+            );*/
+
             vel_pub = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
+
+            
             progress_ = 0.0;
             yaw = std::numeric_limits<float>::quiet_NaN();
+            
         }
 
     private:
@@ -29,6 +39,8 @@ class Rotation : public plansys2::ActionExecutorClient {
         float yaw;
         rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub;
         rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr vel_pub;
+        //rclcpp::Subscription<your_package::msg::ArucoDetection>::SharedPtr markers_sub_;
+        //std::map<std::string, geometry_msgs::msg::PoseStamped> waypoints_;
 
         void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
             const auto & q = msg->pose.pose.orientation;
