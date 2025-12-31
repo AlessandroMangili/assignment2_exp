@@ -134,6 +134,14 @@ def generate_launch_description():
         namespace=namespace,
         output='screen',
         parameters=[])
+    
+    move_2_cmd = Node(
+        package='assignment2_exp',
+        executable='move_to_waypoint_action_2',
+        name='move_to_waypoint_action_2',
+        namespace=namespace,
+        output='screen',
+        parameters=[])
 
     rotation_cmd = Node(
         package='assignment2_exp',
@@ -143,10 +151,26 @@ def generate_launch_description():
         output='screen',
         parameters=[])
 
+    rotation_2_cmd = Node(
+        package='assignment2_exp',
+        executable='rotation_action_node_2',
+        name='rotation_action_node_2',
+        namespace=namespace,
+        output='screen',
+        parameters=[])
+
     check_end_cmd = Node(
         package='assignment2_exp',
         executable='check_end_action_node',
         name='check_end_action_node',
+        namespace=namespace,
+        output='screen',
+        parameters=[])
+
+    finalization_cmd = Node(
+        package='assignment2_exp',
+        executable='finalization_action_node',
+        name='finalization_action_node',
         namespace=namespace,
         output='screen',
         parameters=[])
@@ -167,8 +191,13 @@ def generate_launch_description():
     ld.add_action(planner_cmd)
     ld.add_action(executor_cmd)
     ld.add_action(lifecycle_manager_cmd)
+    
     ld.add_action(move_cmd)
     ld.add_action(rotation_cmd)
     ld.add_action(check_end_cmd)
+
+    ld.add_action(move_2_cmd)
+    ld.add_action(rotation_2_cmd)
+    ld.add_action(finalization_cmd)
     
     return ld

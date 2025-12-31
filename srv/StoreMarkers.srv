@@ -1,0 +1,5 @@
+int32 marker_id
+string marker
+---
+int32[] markers_id
+string[] markers

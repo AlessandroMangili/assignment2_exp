@@ -8,7 +8,9 @@
 #include "geometry_msgs/msg/twist.hpp"
 
 #include "plansys2_executor/ActionExecutorClient.hpp"
-//#include "your_package/msg/aruco_detection.hpp"
+#include "aruco_opencv_msgs/msg/aruco_detection.hpp"
+
+#include "marker_service_pkg/srv/store_markers.hpp"
 
 using namespace std::chrono_literals;
 
@@ -20,27 +22,42 @@ class Rotation : public plansys2::ActionExecutorClient {
                 100, 
                 std::bind(&Rotation::odom_callback, this, std::placeholders::_1)
             );
-            /*markers_sub_ = this->create_subscription<your_package::msg::ArucoDetection>(
+            markers_sub_ = this->create_subscription<aruco_opencv_msgs::msg::ArucoDetection>(
                 "/aruco_detections",
                 100,
-                std::bind(&YourNodeClass::marker_detection, this, std::placeholders::_1)
-            );*/
+                std::bind(&Rotation::marker_detection, this, std::placeholders::_1)
+            );
+
+            store_client_ = this->create_client<marker_service_pkg::srv::StoreMarkers>(
+                "/store_markers"
+            );
+            request = std::make_shared<marker_service_pkg::srv::StoreMarkers::Request>();
 
             vel_pub = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
 
-            
             progress_ = 0.0;
             yaw = std::numeric_limits<float>::quiet_NaN();
-            
+            request_sent = true;
         }
+
+        /*rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn on_activate(const rclcpp_lifecycle::State &previous_state) {
+            RCLCPP_INFO(get_logger(), "Configuring Rotation node");
+            progress_ = 0.0;
+            return ActionExecutorClient::on_activate(previous_state);
+        }*/
 
     private:
         float progress_;
         float yaw;
         rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub;
         rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr vel_pub;
-        //rclcpp::Subscription<your_package::msg::ArucoDetection>::SharedPtr markers_sub_;
-        //std::map<std::string, geometry_msgs::msg::PoseStamped> waypoints_;
+        rclcpp::Subscription<aruco_opencv_msgs::msg::ArucoDetection>::SharedPtr markers_sub_;
+        std::string waypoint;
+        
+        rclcpp::Client<marker_service_pkg::srv::StoreMarkers>::SharedPtr store_client_;
+        std::shared_ptr<marker_service_pkg::srv::StoreMarkers::Request> request;
+        bool request_sent;
+
 
         void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
             const auto & q = msg->pose.pose.orientation;
@@ -54,20 +71,58 @@ class Rotation : public plansys2::ActionExecutorClient {
         double normalize_angle(double angle) {
             return std::atan2(std::sin(angle), std::cos(angle));
         }
+
+        void marker_detection(const aruco_opencv_msgs::msg::ArucoDetection::SharedPtr msg) {
+            if (msg->markers.empty() || waypoint.empty()) {
+                return;
+            }
+
+            for (const auto & marker : msg->markers) {
+                int marker_id = static_cast<int>(marker.marker_id);
+
+                //RCLCPP_INFO(this->get_logger(), "MARKER ID %d", marker_id);     
+
+                if (!request_sent) {
+                    request->marker_id = marker_id;
+                    request->marker = waypoint;
+
+                    try {
+                        request_sent = true;
+                        auto result_future = store_client_->async_send_request(request,
+                            [this](rclcpp::Client<marker_service_pkg::srv::StoreMarkers>::SharedFuture response) {
+                                RCLCPP_INFO(this->get_logger(), "Service response received: %zu markers stored", response.get()->markers_id.size());
+                            });
+                    } catch (const std::exception & e) {
+                        RCLCPP_ERROR(this->get_logger(), "Failed to call store service: %s", e.what());
+                        request_sent = false;
+                    }   
+                }
+            }
+        }
         
         void do_work() override {
+            auto args = get_arguments();
+            if (args.size() < 2) {
+                RCLCPP_ERROR(get_logger(), "Not enough arguments for move action");
+                finish(false, 0.0, "Insufficient arguments");
+                return;
+            }
+            // To reset and allow to send the makrker id each time the robot approches a new marker
+            if (waypoint != args[1]) {
+                request_sent = false;
+            }
+            waypoint = args[1];
+
             static bool rotating = false;               // STATIC fa in modo di far rimanere la variabile tra una chiamata e l'altra
             static float cumulative_rotation = 0.0;
             static float last_yaw = 0.0;
 
-            // aspetta odom
             if (std::isnan(yaw)) {
                 RCLCPP_INFO(this->get_logger(), "Waiting for odom");
                 send_feedback(0.0, "Waiting for odom");
                 return;
             }
 
-            // inizializzazione
             if (!rotating) {
                 rotating = true;
                 cumulative_rotation = 0.0;
@@ -86,10 +141,8 @@ class Rotation : public plansys2::ActionExecutorClient {
             progress_ = std::min(1.0f, cumulative_rotation / float(2.0 * M_PI));
             progress_ = std::round(progress_ * 100.0f) / 100.0f;
             send_feedback(progress_, "Rotating");
-
-            RCLCPP_INFO(this->get_logger(), "Yaw %.3f | delta %.3f | cum %.3f", yaw, delta, cumulative_rotation);
-
             if (cumulative_rotation >= 2.0 * M_PI) {
+                send_feedback(progress_, "Rotating");
                 twist.angular.z = 0.0;
                 vel_pub->publish(twist);
 
@@ -109,6 +162,7 @@ int main(int argc, char ** argv) {
 
     node->set_parameter(rclcpp::Parameter("action_name", "rotation"));
     node->trigger_transition(lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE);
+    node->trigger_transition(lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE);
 
     rclcpp::spin(node->get_node_base_interface());
     rclcpp::shutdown();
