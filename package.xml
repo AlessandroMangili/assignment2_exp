@@ -16,6 +16,9 @@
   <depend>nav_msgs</depend>
   <depend>lifecycle_msgs</depend>
   <depend>plansys2_executor</depend>
+  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>cv_bridge</depend>
   
   <depend>marker_service_pkg</depend>
 

@@ -15,9 +15,11 @@ class Check : public plansys2::ActionExecutorClient {
 
     private:
         void do_work() override {
-            finish(true, 1.0, "Checked completed");
+            progress_ = 1.0;
+            send_feedback(progress_);
+            finish(true, 1.0, "Patrolling completed!");
             progress_ = 0.0;
-            RCLCPP_INFO(this->get_logger(), "END COMPLETED!");
+            RCLCPP_INFO(this->get_logger(), "Patrolling completed!....\nThe finding part is starting");
         }
 
         float progress_;

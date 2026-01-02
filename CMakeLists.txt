@@ -22,6 +22,9 @@ find_package(plansys2_problem_expert REQUIRED)
 find_package(aruco_opencv_msgs REQUIRED) 
 find_package(std_msgs REQUIRED)
 find_package(marker_service_pkg REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(OpenCV REQUIRED)
+find_package(cv_bridge REQUIRED)
 
 add_executable(get_plan src/getplan.cpp)
 add_executable(get_plan_and_execute src/getplan_and_execute.cpp)
@@ -30,7 +33,7 @@ add_executable(move_to_waypoint_action src/move_to_waypoint_action.cpp)
 add_executable(check_end_action_node src/check_end_action_node.cpp)
 
 add_executable(move_to_waypoint_action_2 src/move_to_waypoint_action_2.cpp)
-add_executable(rotation_action_node_2 src/rotation_action_node_2.cpp)
+add_executable(alignment_and_picture_node src/alignment_and_picture_node.cpp)
 add_executable(finalization_action_node src/finalization_action_node.cpp)
 
 ament_target_dependencies(get_plan
@@ -93,9 +96,10 @@ ament_target_dependencies(move_to_waypoint_action_2
     plansys2_msgs
     geometry_msgs
     nav2_msgs
+    marker_service_pkg
 )
 
-ament_target_dependencies(rotation_action_node_2
+ament_target_dependencies(alignment_and_picture_node
     rclcpp
     rclcpp_action
     plansys2_executor
@@ -103,7 +107,12 @@ ament_target_dependencies(rotation_action_node_2
     geometry_msgs
     nav2_msgs
     aruco_opencv_msgs
+    sensor_msgs
+    marker_service_pkg
+    cv_bridge
 )
+
+target_link_libraries(alignment_and_picture_node ${OpenCV_LIBS})
 
 install(DIRECTORY
   domain
@@ -112,7 +121,7 @@ install(DIRECTORY
 )
 
 install(TARGETS
-  get_plan get_plan_and_execute rotation_action_node move_to_waypoint_action check_end_action_node move_to_waypoint_action_2 rotation_action_node_2 finalization_action_node
+  get_plan get_plan_and_execute rotation_action_node move_to_waypoint_action check_end_action_node move_to_waypoint_action_2 alignment_and_picture_node finalization_action_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

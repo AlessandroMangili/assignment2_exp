@@ -10,72 +10,110 @@
 #include <string>
 #include <algorithm>
 #include <cmath>
+#include <map>
+
+#include "marker_service_pkg/srv/store_markers.hpp"
+#include "geometry_msgs/msg/pose_with_covariance_stamped.hpp"
 
 using namespace std::chrono_literals;
+using std::placeholders::_1;
 
-class MoveAction2 : public plansys2::ActionExecutorClient {
+class MoveAction : public plansys2::ActionExecutorClient {
     public:
-        MoveAction2() : plansys2::ActionExecutorClient("move_to_waypoint_2", 250ms) {
-            /*odom = this->create_subscription<nav_msgs::msg::Odometry>(
-                "/odom", 
-                100,
-                std::bind(&MoveAction2::odom_callback, this, std::placeholders::_1)
-            );
-            nav2_node_ = rclcpp::Node::make_shared("move_action_nav2_client");
-            nav2_client_ = rclcpp_action::create_client<nav2_msgs::action::NavigateToPose>(nav2_node_, "navigate_to_pose");*/
-
+        MoveAction() : plansys2::ActionExecutorClient("move_to_waypoint_2", 250ms) {
+            nav2_node = rclcpp::Node::make_shared("move_action_nav2_client");
+            nav2_client = rclcpp_action::create_client<nav2_msgs::action::NavigateToPose>(nav2_node, "navigate_to_pose");
             progress_ = 0.0;
-            goal_sent_ = false;
-        }
+            goal_sent = false;
+            markers.clear();
 
+            pos_sub = create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
+                "/amcl_pose",
+                1000,
+                std::bind(&MoveAction::current_pos_callback, this, _1)
+            );
+
+            store_client = this->create_client<marker_service_pkg::srv::StoreMarkers>(
+                "/store_markers"
+            );
+        }
+        
     private:
         float progress_;
-        bool goal_sent_;
-        double start_x_ = 0.0, start_y_ = 0.0;
-        double current_x_ = 0.0, current_y_ = 0.0;
+        bool goal_sent;
+        double start_x = 0.0, start_y = 0.0;
+        std::map<int32_t, std::string> markers;
+        rclcpp::Node::SharedPtr nav2_node;
+        rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SharedPtr nav2_client;
+        rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pos_sub;
+        geometry_msgs::msg::Pose current_pos;
+        rclcpp::Client<marker_service_pkg::srv::StoreMarkers>::SharedPtr store_client;
+        std::string wp_to_navigate;
 
-        rclcpp::Node::SharedPtr nav2_node_;
-        rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SharedPtr nav2_client_;
-        rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom;
-
-        /*void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg)
-        {
-            current_x_ = msg->pose.pose.position.x;
-            current_y_ = msg->pose.pose.position.y;
-        }*/
+        void current_pos_callback(const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg) {
+            current_pos = msg->pose.pose;
+        }
 
         void do_work() override {
-            /*auto args = get_arguments();
+            static bool get_markers = false;
+            if (!get_markers) {
+                if (!store_client->wait_for_service(2s)) {
+                    RCLCPP_ERROR(get_logger(), "Service /store_markers not available");
+                    return;
+                }
 
+                auto request = std::make_shared<marker_service_pkg::srv::StoreMarkers::Request>();
+                request->marker_id = -1;
+                store_client->async_send_request(request,
+                    [this](rclcpp::Client<marker_service_pkg::srv::StoreMarkers>::SharedFuture future) {
+                        auto response = future.get();
+                        for (size_t i = 0; i < response->markers_id.size(); ++i) {
+                            markers[response->markers_id[i]] = response->markers[i];
+                        }
+                        RCLCPP_INFO(get_logger(), "Store markers completato");
+                        return;
+                    });
+                get_markers = true;
+            }
+
+            auto args = get_arguments();
             if (args.size() < 3) {
                 RCLCPP_ERROR(get_logger(), "Not enough arguments for move action");
                 finish(false, 0.0, "Insufficient arguments");
                 return;
             }
 
-            std::string wp_to_navigate = args[2];
-            double goal_x, goal_y;
-            if (wp_to_navigate == "wp1") {
-                goal_x = -6.0;
-                goal_y = -6.0;
-            } else if (wp_to_navigate == "wp2") {
-                goal_x = -6.0;
-                goal_y = 6.0;
-            } else if (wp_to_navigate == "wp3") {
-                goal_x = 6.0;
-                goal_y = -6.0;
-            } else if (wp_to_navigate == "wp4") {
-                goal_x = 6.0;
-                goal_y = 6.0;
-            } else {
-                RCLCPP_ERROR(get_logger(), "Unknown waypoint: %s", wp_to_navigate.c_str());
-                finish(false, 0.0, "Unknown waypoint");
+
+            if (markers.empty()) {
+                RCLCPP_WARN(get_logger(), "Failed to get the lowest marker id");
                 return;
             }
 
-            if (!goal_sent_) {
-                if (!nav2_client_->wait_for_action_server(1s)) {
+            static double goal_x, goal_y;         
+            if (!goal_sent) {
+                auto item = markers.begin(); 
+                wp_to_navigate = item->second;
+
+                if (!nav2_client->wait_for_action_server(1s)) {
                     RCLCPP_WARN(get_logger(), "NavigateToPose server not ready");
+                    return;
+                }
+
+                if (wp_to_navigate == "wp1") {
+                    goal_x = -6.8;
+                    goal_y = -8.0;
+                } else if (wp_to_navigate == "wp2") {
+                    goal_x = -6.0;
+                    goal_y = 6.0;
+                } else if (wp_to_navigate == "wp3") {
+                    goal_x = 6.5;
+                    goal_y = -8.0;
+                } else if (wp_to_navigate == "wp4") {
+                    goal_x = 6.0;
+                    goal_y = 6.0;
+                } else {
+                    RCLCPP_ERROR(get_logger(), "Unknown waypoint: %s", wp_to_navigate.c_str());
+                    finish(false, 0.0, "Unknown waypoint");
                     return;
                 }
 
@@ -92,55 +130,51 @@ class MoveAction2 : public plansys2::ActionExecutorClient {
 
                 rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SendGoalOptions send_goal_options;
                 send_goal_options.result_callback =
-                    [this, wp_to_navigate](const rclcpp_action::ClientGoalHandle<nav2_msgs::action::NavigateToPose>::WrappedResult & result)
-                    {
+                    [this](const rclcpp_action::ClientGoalHandle<nav2_msgs::action::NavigateToPose>::WrappedResult & result) {
                         if (result.code != rclcpp_action::ResultCode::SUCCEEDED) {
-                            RCLCPP_ERROR(get_logger(), "Navigation failed: %s", wp_to_navigate.c_str());
-                            finish(true, 1.0, "Move failed");
+                            RCLCPP_ERROR(get_logger(), "Navigation failed: %s", this->wp_to_navigate.c_str());
+                            finish(true, 1.0, "Navigation failed");
                         } else if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
-                            goal_sent_= false;
+                            goal_sent= false;
                             progress_ = 1.0;
+                            markers.erase(markers.begin());
                             send_feedback(progress_, "Moving to " + wp_to_navigate);
-                            RCLCPP_INFO(get_logger(), "Reached waypoint: %s", wp_to_navigate.c_str());
-                            finish(true, 1.0, "Move completed");
+                            RCLCPP_INFO(get_logger(), "Reached waypoint: %s", this->wp_to_navigate.c_str());
+                            finish(true, 1.0, "Navigation completed");
                         }
                     };
 
-                nav2_client_->async_send_goal(goal_msg, send_goal_options);
-                goal_sent_ = true;
+                nav2_client->async_send_goal(goal_msg, send_goal_options);
+                goal_sent = true;
 
-                start_x_ = current_x_;
-                start_y_ = current_y_;
+                start_x = current_pos.position.x;
+                start_y = current_pos.position.y;
             }
 
-            double total_dist = std::hypot(goal_x - start_x_, goal_y - start_y_);
-            double rem_dist   = std::hypot(goal_x - current_x_, goal_y - current_y_);
+            double total_dist = std::hypot(goal_x - start_x, goal_y - start_y);
+            double rem_dist   = std::hypot(goal_x - current_pos.position.x, goal_y - current_pos.position.y);
             progress_ = total_dist > 0.0 ? 1.0 - std::min(rem_dist / total_dist, 1.0) : 1.0;
 
             send_feedback(progress_, "Moving to " + wp_to_navigate);
-
-            if (rem_dist < 0.4) {
-                goal_sent_= false;
+            if (rem_dist < 0.25) {
+                goal_sent= false;
                 progress_ = 1.0;
+                markers.erase(markers.begin());
                 send_feedback(progress_, "Moving to " + wp_to_navigate);
                 RCLCPP_INFO(get_logger(), "Reached waypoint: %s", wp_to_navigate.c_str());
                 finish(true, 1.0, "Move completed");
             }
-            rclcpp::spin_some(nav2_node_);*/
-            progress_ = 1.0;
-            //send_feedback(progress_, "Moving to " + wp_to_navigate);
-            //RCLCPP_INFO(get_logger(), "Reached waypoint: %s", wp_to_navigate.c_str());
-            send_feedback(progress_, "Rotating");
-            finish(true, 1.0, "Move completed");
+            rclcpp::spin_some(nav2_node);
         }
 };
 
 int main(int argc, char ** argv) {
     rclcpp::init(argc, argv);
-    auto node = std::make_shared<MoveAction2>();
+    auto node = std::make_shared<MoveAction>();
 
     node->set_parameter(rclcpp::Parameter("action_name", "move_to_waypoint_2"));
     node->trigger_transition(lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE);
+    node->trigger_transition(lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE);
 
     rclcpp::spin(node->get_node_base_interface());
 

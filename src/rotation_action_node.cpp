@@ -14,30 +14,38 @@
 
 using namespace std::chrono_literals;
 
+using std::placeholders::_1;
+
+double quaternion_to_yaw(double x, double y, double z, double w) {
+    return std::atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z));
+}
+
+double normalize_angle(double angle) {
+    return std::atan2(std::sin(angle), std::cos(angle));
+}
+
 class Rotation : public plansys2::ActionExecutorClient {
     public:
         Rotation(): plansys2::ActionExecutorClient("rotation", 100ms) {
-            odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(
-                "/odom", 
-                100, 
-                std::bind(&Rotation::odom_callback, this, std::placeholders::_1)
-            );
-            markers_sub_ = this->create_subscription<aruco_opencv_msgs::msg::ArucoDetection>(
-                "/aruco_detections",
-                100,
-                std::bind(&Rotation::marker_detection, this, std::placeholders::_1)
-            );
-
-            store_client_ = this->create_client<marker_service_pkg::srv::StoreMarkers>(
-                "/store_markers"
-            );
-            request = std::make_shared<marker_service_pkg::srv::StoreMarkers::Request>();
-
-            vel_pub = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
-
             progress_ = 0.0;
             yaw = std::numeric_limits<float>::quiet_NaN();
             request_sent = true;
+            
+            vel_pub = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
+            odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(
+                "/odom", 
+                100, 
+                std::bind(&Rotation::odom_callback, this, _1)
+            );
+            markers_sub = this->create_subscription<aruco_opencv_msgs::msg::ArucoDetection>(
+                "/aruco_detections",
+                100,
+                std::bind(&Rotation::marker_detection, this, _1)
+            );
+            store_client = this->create_client<marker_service_pkg::srv::StoreMarkers>(
+                "/store_markers"
+            );
+            request = std::make_shared<marker_service_pkg::srv::StoreMarkers::Request>();
         }
 
         /*rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn on_activate(const rclcpp_lifecycle::State &previous_state) {
@@ -51,10 +59,10 @@ class Rotation : public plansys2::ActionExecutorClient {
         float yaw;
         rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub;
         rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr vel_pub;
-        rclcpp::Subscription<aruco_opencv_msgs::msg::ArucoDetection>::SharedPtr markers_sub_;
+        rclcpp::Subscription<aruco_opencv_msgs::msg::ArucoDetection>::SharedPtr markers_sub;
         std::string waypoint;
         
-        rclcpp::Client<marker_service_pkg::srv::StoreMarkers>::SharedPtr store_client_;
+        rclcpp::Client<marker_service_pkg::srv::StoreMarkers>::SharedPtr store_client;
         std::shared_ptr<marker_service_pkg::srv::StoreMarkers::Request> request;
         bool request_sent;
 
@@ -62,14 +70,6 @@ class Rotation : public plansys2::ActionExecutorClient {
         void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
             const auto & q = msg->pose.pose.orientation;
             yaw = quaternion_to_yaw(q.x, q.y, q.z, q.w);
-        }
-
-        double quaternion_to_yaw(double x, double y, double z, double w) {
-            return std::atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z));
-        }
-
-        double normalize_angle(double angle) {
-            return std::atan2(std::sin(angle), std::cos(angle));
         }
 
         void marker_detection(const aruco_opencv_msgs::msg::ArucoDetection::SharedPtr msg) {
@@ -88,7 +88,7 @@ class Rotation : public plansys2::ActionExecutorClient {
 
                     try {
                         request_sent = true;
-                        auto result_future = store_client_->async_send_request(request,
+                        auto result_future = store_client->async_send_request(request,
                             [this](rclcpp::Client<marker_service_pkg::srv::StoreMarkers>::SharedFuture response) {
                                 RCLCPP_INFO(this->get_logger(), "Service response received: %zu markers stored", response.get()->markers_id.size());
                             });
@@ -100,7 +100,11 @@ class Rotation : public plansys2::ActionExecutorClient {
             }
         }
         
-        void do_work() override {
+        void do_work() override {   
+            static bool rotating = false;               // STATIC fa in modo di far rimanere la variabile tra una chiamata e l'altra
+            static float cumulative_rotation = 0.0;
+            static float last_yaw = 0.0;
+            
             auto args = get_arguments();
             if (args.size() < 2) {
                 RCLCPP_ERROR(get_logger(), "Not enough arguments for move action");
@@ -112,10 +116,6 @@ class Rotation : public plansys2::ActionExecutorClient {
                 request_sent = false;
             }
             waypoint = args[1];
-
-            static bool rotating = false;               // STATIC fa in modo di far rimanere la variabile tra una chiamata e l'altra
-            static float cumulative_rotation = 0.0;
-            static float last_yaw = 0.0;
 
             if (std::isnan(yaw)) {
                 RCLCPP_INFO(this->get_logger(), "Waiting for odom");
@@ -139,7 +139,7 @@ class Rotation : public plansys2::ActionExecutorClient {
             last_yaw = yaw;
 
             progress_ = std::min(1.0f, cumulative_rotation / float(2.0 * M_PI));
-            progress_ = std::round(progress_ * 100.0f) / 100.0f;
+            //progress_ = std::round(progress_ * 100.0f) / 100.0f;
             send_feedback(progress_, "Rotating");
             if (cumulative_rotation >= 2.0 * M_PI) {
                 send_feedback(progress_, "Rotating");
@@ -151,7 +151,7 @@ class Rotation : public plansys2::ActionExecutorClient {
                 cumulative_rotation = 0.0;
                 progress_ = 0.0;
 
-                RCLCPP_INFO(this->get_logger(), "ROTATION COMPLETED!");
+                RCLCPP_INFO(this->get_logger(), "Rotation over %s completed!", waypoint.c_str());
             }
         }
 };

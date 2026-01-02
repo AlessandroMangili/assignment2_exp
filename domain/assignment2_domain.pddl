@@ -21,7 +21,7 @@
     )
 
     ;; Actions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    (:action move_to_waypoint
+    (:action move_to_waypoint_2
         :parameters (?r - robot ?wp1 - waypoint ?wp2 - waypoint)
         :precondition (and 
             (robot_at ?r ?wp1)
@@ -37,7 +37,7 @@
         )
     )
 
-    ;(:durative-action rotation
+    ;(:durative-action alignment_and_picture
     ;    :parameters (?r - robot ?wp - waypoint)
     ;    :duration (= ?duration 2)
     ;    :condition (and 
@@ -50,7 +50,7 @@
     ;    )
     ;)
 
-    (:action rotation
+    (:action alignment_and_picture
         :parameters (?r - robot ?wp - waypoint)
         :precondition (and 
             (robot_at ?r ?wp)

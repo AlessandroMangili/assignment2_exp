@@ -15,9 +15,9 @@ class Finalization : public plansys2::ActionExecutorClient {
 
     private:
         void do_work() override {
-            finish(true, 1.0, "Checked completed");
+            finish(true, 1.0, "Task completed");
             progress_ = 0.0;
-            RCLCPP_INFO(this->get_logger(), "END COMPLETED!");
+            RCLCPP_INFO(this->get_logger(), "TASK COMPLETED!");
         }
 
         float progress_;

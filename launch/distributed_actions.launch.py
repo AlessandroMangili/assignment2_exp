@@ -153,8 +153,8 @@ def generate_launch_description():
 
     rotation_2_cmd = Node(
         package='assignment2_exp',
-        executable='rotation_action_node_2',
-        name='rotation_action_node_2',
+        executable='alignment_and_picture_node',
+        name='alignment_and_picture_node',
         namespace=namespace,
         output='screen',
         parameters=[])
@@ -192,8 +192,8 @@ def generate_launch_description():
     ld.add_action(executor_cmd)
     ld.add_action(lifecycle_manager_cmd)
     
-    ld.add_action(move_cmd)
-    ld.add_action(rotation_cmd)
+    """ld.add_action(move_cmd)
+    ld.add_action(rotation_cmd)"""
     ld.add_action(check_end_cmd)
 
     ld.add_action(move_2_cmd)
