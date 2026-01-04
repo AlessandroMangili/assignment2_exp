@@ -1,6 +1,7 @@
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription, TimerAction, LogInfo, ExecuteProcess
 from launch.launch_description_sources import PythonLaunchDescriptionSource, AnyLaunchDescriptionSource
+from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 import os
 
@@ -12,6 +13,15 @@ def generate_launch_description():
         name='store_markers_service',
         output='screen'
     )
+    """
+    generating_plan = ExecuteProcess(
+        cmd=[
+            'gnome-terminal', '--',
+            'ros2', 'run', 'marker_service_pkg', 'store_markers_service'
+        ],
+        output='screen'
+    )
+    """
 
     # 1. Spawn robot
     spawn_robot_launch = IncludeLaunchDescription(
@@ -58,14 +68,12 @@ def generate_launch_description():
     )
 
     # 5. Generate plan
-    generating_plan_launch = IncludeLaunchDescription(
-        AnyLaunchDescriptionSource(
-            os.path.join(
-                get_package_share_directory('assignment2_exp'),
-                'launch',
-                'distributed_actions.launch.py'
-            )
-        )
+    generating_plan = ExecuteProcess(
+        cmd=[
+            'gnome-terminal', '--',
+            'ros2', 'launch', 'assignment2_exp', 'distributed_actions.launch.py'
+        ],
+        output='screen'
     )
 
     # 6. Start scanning / execution in new terminal
@@ -105,7 +113,7 @@ def generate_launch_description():
             period=10.0,
             actions=[
                 LogInfo(msg='Starting plan generation'),
-                generating_plan_launch
+                generating_plan
             ]
         ),
 
@@ -114,7 +122,7 @@ def generate_launch_description():
             period=14.0,
             actions=[
                 LogInfo(msg='Executing plan (node)'),
-                execute_plan_node,   # preferito: lo esegue come node normale
+                execute_plan,   # preferito: lo esegue come node normale
                 # execute_plan_new_term,  # alternativa: esegui in nuovo terminale se preferisci
             ]
         ),
