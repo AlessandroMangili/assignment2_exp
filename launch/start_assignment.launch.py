@@ -70,7 +70,7 @@ def generate_launch_description():
     # 5. Generate plan
     generating_plan = ExecuteProcess(
         cmd=[
-            'gnome-terminal', '--',
+            'gnome-terminal', '--title=Executors', '--',
             'ros2', 'launch', 'assignment2_exp', 'distributed_actions.launch.py'
         ],
         output='screen'
@@ -79,7 +79,7 @@ def generate_launch_description():
     # 6. Start scanning / execution in new terminal
     execute_plan = ExecuteProcess(
         cmd=[
-            'gnome-terminal', '--',
+            'gnome-terminal', '--title=Plan', '--',
             'ros2', 'run', 'assignment2_exp', 'get_plan_and_execute'
         ],
         output='screen'

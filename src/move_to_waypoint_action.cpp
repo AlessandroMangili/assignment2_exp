@@ -75,6 +75,7 @@ class MoveAction : public plansys2::ActionExecutorClient {
                 
                 if (!nav2_client->wait_for_action_server(1s)) {
                     RCLCPP_WARN(get_logger(), "NavigateToPose server not ready");
+                    send_feedback(0.0, "Waiting for NavigateToPose server");
                     return;
                 }
 
@@ -116,20 +117,18 @@ class MoveAction : public plansys2::ActionExecutorClient {
                                 goal_sent = false;
                                 progress_ = 1.0;
                                 send_feedback(progress_, "Moving to " + wp_to_navigate);
-                                RCLCPP_INFO(get_logger(), "Reached waypoint: %s", this->wp_to_navigate.c_str());
+                                RCLCPP_INFO(get_logger(), "Waypoint %s reached", this->wp_to_navigate.c_str());
                                 finish(true, 1.0, "Navigation completed");
                                 break;
                             case rclcpp_action::ResultCode::ABORTED:
-                                RCLCPP_WARN(get_logger(), "Nav2 aborted goal, waiting distance check");
                                 goal_sent = false;
-                                RCLCPP_ERROR(get_logger(), "Navigation failed: %s", this->wp_to_navigate.c_str());
+                                RCLCPP_ERROR(get_logger(), "Navigation to %s failed", this->wp_to_navigate.c_str());
                                 finish(false, 0.0, "Navigation failed");
                                 break;
                             default:
-                                RCLCPP_WARN(get_logger(), "Nav2 returned unknown state");
                                 goal_sent = false;
-                                RCLCPP_ERROR(get_logger(), "Navigation failed: %s", this->wp_to_navigate.c_str());
-                                finish(false, 0.0, "Navigation failed");
+                                RCLCPP_ERROR(get_logger(), "Navigation returned unknown state");
+                                finish(false, 0.0, "Navigation returned unknown state");
                                 break;
                         }
                         return;   
@@ -148,7 +147,6 @@ class MoveAction : public plansys2::ActionExecutorClient {
             double rem_dist   = std::hypot(goal_x - current_pos.position.x, goal_y - current_pos.position.y);
             progress_ = total_dist > 0.0 ? 1.0 - std::min(rem_dist / total_dist, 1.0) : 1.0;
             send_feedback(progress_, "Moving to " + wp_to_navigate);
-
             /*if (rem_dist < 0.25) {
                 goal_sent= false;
                 progress_ = 1.0;

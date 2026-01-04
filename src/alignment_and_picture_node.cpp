@@ -21,6 +21,8 @@ using namespace std::chrono_literals;
 
 using std::placeholders::_1;
 
+const bool DEBUG = false;
+
 double quaternion_to_yaw(double x, double y, double z, double w) {
     return std::atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z));
 }
@@ -90,10 +92,10 @@ class Alignment : public plansys2::ActionExecutorClient {
             }
         }
 
-        void drawCircle(int marker_id) {
+        bool drawCircle(int marker_id) {
             if (cv_image.empty()) {
-                RCLCPP_WARN(this->get_logger(), "No image has been saved");
-                return;
+                RCLCPP_ERROR(this->get_logger(), "No image has been saved");
+                return false;
             }
 
             try {
@@ -107,7 +109,8 @@ class Alignment : public plansys2::ActionExecutorClient {
                 cv::aruco::detectMarkers(cv_image, aruco_dict, corners, ids, parameters, rejected);
 
                 if (ids.empty()) {
-                    RCLCPP_WARN(this->get_logger(), "No aruco markers detected!");
+                    RCLCPP_ERROR(this->get_logger(), "No aruco markers detected");
+                    return false;
                 } else {
                     size_t n = std::min(ids.size(), corners.size());
                     for (size_t i = 0; i < n; ++i) {
@@ -128,7 +131,7 @@ class Alignment : public plansys2::ActionExecutorClient {
                         cv::circle(cv_image, center_int, radius, cv::Scalar(0,0,255), 2);
                         cv::circle(cv_image, center_int, 3, cv::Scalar(0,0,255), -1);
                         cv::putText(cv_image, "marker_id=" + std::to_string(current_marker_id),
-                                    cv::Point(center_int.x, center_int.y + 40),
+                                    cv::Point(center_int.x, center_int.y),
                                     cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0,255,0), 2, cv::LINE_AA);
                     }
                 }
@@ -136,16 +139,17 @@ class Alignment : public plansys2::ActionExecutorClient {
                 cv::waitKey(20);
             } catch (const std::exception &e) {
                 RCLCPP_ERROR(this->get_logger(), "Exception raised by drawCircle: %s", e.what());
-                return;
+                return false;
             }
 
             try {
                 auto msg = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", cv_image).toImageMsg();
                 msg->header = header;
                 image_pub->publish(*msg);
+                return true;
             } catch (const std::exception &e) {
-                RCLCPP_ERROR(this->get_logger(), "Exception while converting image: %s", e.what());
-                return;
+                RCLCPP_ERROR(this->get_logger(), "Exception while publishing image: %s", e.what());
+                return false;
             }
         }
 
@@ -161,7 +165,7 @@ class Alignment : public plansys2::ActionExecutorClient {
                 cv::aruco::detectMarkers(this->cv_image, aruco_dict, corners, ids, parameters, rejected);
 
                 if (ids.empty()) {
-                    RCLCPP_WARN(this->get_logger(), "No corners have been detected");
+                    if (DEBUG) RCLCPP_WARN(this->get_logger(), "No corners have been detected");
                     return false;
                 }
 
@@ -169,13 +173,13 @@ class Alignment : public plansys2::ActionExecutorClient {
                 for (size_t i = 0; i < n; ++i) {
                     int actual_marker_id = ids[i];
                     if (marker_id != actual_marker_id) {
-                        RCLCPP_WARN(this->get_logger(), "Marker id %d does not match target %d", actual_marker_id, marker_id);
+                        if (DEBUG) RCLCPP_WARN(this->get_logger(), "Marker id %d does not match target %d", actual_marker_id, marker_id);
                         continue;
                     }
 
                     const auto &pts = corners[i];
                     if (pts.size() < 4) {
-                        RCLCPP_WARN(this->get_logger(), "Invalid corner size for marker %d", actual_marker_id);
+                        if (DEBUG) RCLCPP_WARN(this->get_logger(), "Invalid corner size for marker %d", actual_marker_id);
                         continue;
                     }
 
@@ -189,20 +193,22 @@ class Alignment : public plansys2::ActionExecutorClient {
                         RCLCPP_INFO(this->get_logger(), "Frames %d/%d centered for marker: %d", this->centered_counts[actual_marker_id], this->REQUIRED_CONSECUTIVE, actual_marker_id);
                     } else {
                         this->centered_counts[actual_marker_id] = 0;
-                        RCLCPP_WARN(this->get_logger(), "Frame not centered for marker: %d", actual_marker_id);
+                        if (DEBUG) RCLCPP_WARN(this->get_logger(), "Frame not centered for marker: %d", actual_marker_id);
                     }
 
                     if (this->centered_counts[actual_marker_id] >= this->REQUIRED_CONSECUTIVE) {
-                        RCLCPP_INFO(this->get_logger(), "Marker %d CENTERED", actual_marker_id);
-                        cv::namedWindow(std::string("Marker-") + std::to_string(actual_marker_id) + "-p", cv::WINDOW_AUTOSIZE);
-                        cv::imshow(std::string("Marker-") + std::to_string(actual_marker_id) + "-p", this->cv_image);
-                        cv::waitKey(20);
+                        RCLCPP_INFO(this->get_logger(), "Marker %d centered", actual_marker_id);
+                        if (DEBUG) {
+                            cv::namedWindow(std::string("Marker-") + std::to_string(actual_marker_id) + "-p", cv::WINDOW_AUTOSIZE);
+                            cv::imshow(std::string("Marker-") + std::to_string(actual_marker_id) + "-p", this->cv_image);
+                            cv::waitKey(20);
+                        }
                         return true;
                     }
                 }
                 return false;
             } catch (const std::exception &e) {
-                RCLCPP_WARN(this->get_logger(), "Exception raised by the set marker center: %s", e.what());
+                RCLCPP_ERROR(this->get_logger(), "Exception raised by the set marker center: %s", e.what());
                 return false;
             }
         }
@@ -211,11 +217,14 @@ class Alignment : public plansys2::ActionExecutorClient {
             cv::waitKey(1);
             auto args = get_arguments();
             if (args.size() < 2) {
-                RCLCPP_ERROR(get_logger(), "Not enough arguments for alignment");
+                RCLCPP_WARN(get_logger(), "Not enough arguments for alignment");
                 finish(false, 0.0, "Insufficient arguments");
                 return;
             }
             
+            /**
+              * Send a single request to the /store_markers service in order to retrieve the list of waypoints along with their marker ids
+            */
             static bool get_markers = false;
             if (!get_markers) {
                 if (!store_client->wait_for_service(2s)) {
@@ -231,16 +240,15 @@ class Alignment : public plansys2::ActionExecutorClient {
                         for (size_t i = 0; i < response->markers_id.size(); ++i) {
                             markers[response->markers_id[i]] = response->markers[i];
                         }
-                        RCLCPP_INFO(get_logger(), "Store markers completato");
+                        RCLCPP_INFO(get_logger(), "Service's response received successfully");
                         return;
                     });
                 get_markers = true;
             }
 
-            
-
             if (markers.empty()) {
-                RCLCPP_WARN(get_logger(), "Failed to get the lowest marker id");
+                if (DEBUG) RCLCPP_WARN(get_logger(), "Failed to get the lowest marker id due to an empty waypoint list");
+                send_feedback(0.0, "Waiting for service response");
                 return;
             }
 
@@ -252,20 +260,19 @@ class Alignment : public plansys2::ActionExecutorClient {
 
             if (std::isnan(this->yaw)) {
                 RCLCPP_INFO(this->get_logger(), "Waiting for odom");
-                send_feedback(0.0, "Waiting for odom");
+                send_feedback(0.0, "Waiting for service response");
                 return;
             }
 
             if (!rotating) {
                 auto item = markers.begin(); 
                 marker_id = item->first;
-                RCLCPP_INFO(this->get_logger(), "MMARKER ID:%d", marker_id);
                 rotating = true;
                 cumulative_rotation = 0.0;
                 last_yaw = this->yaw;
-                RCLCPP_INFO(this->get_logger(), "Alignment started");
+                twist.angular.z = 0.25;
+                RCLCPP_INFO(this->get_logger(), "Alignment over marker %d started", marker_id);
             }
-            twist.angular.z = 0.25;
             vel_pub->publish(twist);
 
             float delta = normalize_angle(this->yaw - last_yaw);
@@ -273,21 +280,25 @@ class Alignment : public plansys2::ActionExecutorClient {
             last_yaw = this->yaw;
 
             progress_ = std::min(1.0f, cumulative_rotation / float(2.0 * M_PI));
-            send_feedback(progress_, "Rotating");
-
+            //progress_ = std::round(progress_ * 100.0f) / 100.0f;
+            send_feedback(progress_, "Aligning the marker to the camera's center");
             if (centerMarker(marker_id)) {
                 twist.angular.z = 0.0;
                 vel_pub->publish(twist);
 
-                drawCircle(marker_id);
-                
-                markers.erase(markers.begin());
                 rotating = false;
                 cumulative_rotation = 0.0;
                 progress_ = 0.0;
+
+                if (!drawCircle(marker_id)) {
+                    RCLCPP_INFO(this->get_logger(), "Alignment the marker to the camera's center failed!");
+                    finish(false, 0.0, "Alignment the marker to the camera's center failed");
+                    return;
+                }
+                markers.erase(markers.begin());
                 
-                RCLCPP_INFO(this->get_logger(), "Alignment completed!");
-                finish(true, 1.0, "Alignment completed");
+                RCLCPP_INFO(this->get_logger(), "Alignment the marker to the camera's center completed!");
+                finish(true, 1.0, "Alignment the marker to the camera's center completed");
             }
         }
 };

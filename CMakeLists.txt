@@ -97,6 +97,8 @@ ament_target_dependencies(move_to_waypoint_action_2
     geometry_msgs
     nav2_msgs
     marker_service_pkg
+    cv_bridge
+    aruco_opencv_msgs
 )
 
 ament_target_dependencies(alignment_and_picture_node
@@ -106,13 +108,14 @@ ament_target_dependencies(alignment_and_picture_node
     plansys2_msgs
     geometry_msgs
     nav2_msgs
-    aruco_opencv_msgs
     sensor_msgs
     marker_service_pkg
+    aruco_opencv_msgs
     cv_bridge
 )
 
 target_link_libraries(alignment_and_picture_node ${OpenCV_LIBS})
+target_link_libraries(move_to_waypoint_action_2 ${OpenCV_LIBS})
 
 install(DIRECTORY
   domain

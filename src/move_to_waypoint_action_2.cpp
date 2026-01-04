@@ -14,9 +14,14 @@
 
 #include "marker_service_pkg/srv/store_markers.hpp"
 #include "geometry_msgs/msg/pose_with_covariance_stamped.hpp"
+#include "cv_bridge/cv_bridge.hpp"
+#include "opencv2/opencv.hpp"
+#include "opencv2/aruco.hpp"
 
 using namespace std::chrono_literals;
 using std::placeholders::_1;
+
+const bool DEBUG = false;
 
 class MoveAction : public plansys2::ActionExecutorClient {
     public:
@@ -55,9 +60,10 @@ class MoveAction : public plansys2::ActionExecutorClient {
         }
 
         void do_work() override {
+            //cv::waitKey(1);
             auto args = get_arguments();
             if (args.size() < 3) {
-                RCLCPP_ERROR(get_logger(), "Not enough arguments for move action");
+                RCLCPP_WARN(get_logger(), "Not enough arguments for move action");
                 finish(false, 0.0, "Insufficient arguments");
                 return;
             }
@@ -77,25 +83,27 @@ class MoveAction : public plansys2::ActionExecutorClient {
                         for (size_t i = 0; i < response->markers_id.size(); ++i) {
                             markers[response->markers_id[i]] = response->markers[i];
                         }
-                        RCLCPP_INFO(get_logger(), "Store markers completato");
+                        RCLCPP_INFO(get_logger(), "Service's response received successfully");
                         return;
                     });
                 get_markers = true;
             }
 
             if (markers.empty()) {
-                RCLCPP_WARN(get_logger(), "Failed to get the lowest marker id");
+                if (DEBUG) RCLCPP_WARN(get_logger(), "Failed to get the lowest marker id due to an empty waypoint list");
+                send_feedback(0.0, "Waiting for service response");
                 return;
             }
 
             static double goal_x, goal_y;   
             if (!goal_sent) {
                 auto item = markers.begin(); 
-                RCLCPP_WARN(get_logger(), "MAKRER %s - %d", item->second.c_str(), item->first);
+                RCLCPP_INFO(get_logger(), "Moving to waypoint %s - %d", item->second.c_str(), item->first);
                 wp_to_navigate = item->second;
 
                 if (!nav2_client->wait_for_action_server(1s)) {
                     RCLCPP_WARN(get_logger(), "NavigateToPose server not ready");
+                    send_feedback(0.0, "Waiting for NavigateToPose server");
                     return;
                 }
 
@@ -123,10 +131,6 @@ class MoveAction : public plansys2::ActionExecutorClient {
                 goal_pose.pose.position.y = goal_y;
                 goal_pose.pose.orientation.w = 1.0;
 
-                RCLCPP_WARN(get_logger(), "GOAL %f- %f", goal_x, goal_y);
-
-                RCLCPP_INFO(get_logger(), "Moving to waypoint: %s", wp_to_navigate.c_str());
-
                 auto goal_msg = nav2_msgs::action::NavigateToPose::Goal();
                 goal_msg.pose = goal_pose;
 
@@ -139,20 +143,18 @@ class MoveAction : public plansys2::ActionExecutorClient {
                                 progress_ = 1.0;
                                 markers.erase(markers.begin());
                                 send_feedback(progress_, "Moving to " + wp_to_navigate);
-                                RCLCPP_INFO(get_logger(), "Reached waypoint: %s", this->wp_to_navigate.c_str());
+                                RCLCPP_INFO(get_logger(), "Waypoint %s reached", this->wp_to_navigate.c_str());
                                 finish(true, 1.0, "Navigation completed");
                                 break;
                             case rclcpp_action::ResultCode::ABORTED:
-                                RCLCPP_WARN(get_logger(), "Nav2 aborted goal, waiting distance check");
                                 goal_sent = false;
-                                RCLCPP_ERROR(get_logger(), "Navigation failed: %s", this->wp_to_navigate.c_str());
+                                RCLCPP_ERROR(get_logger(), "Navigation to %s failed", this->wp_to_navigate.c_str());
                                 finish(false, 0.0, "Navigation failed");
                                 break;
                             default:
-                                RCLCPP_WARN(get_logger(), "Nav2 returned unknown state");
                                 goal_sent = false;
-                                RCLCPP_ERROR(get_logger(), "Navigation failed: %s", this->wp_to_navigate.c_str());
-                                finish(false, 0.0, "Navigation failed");
+                                RCLCPP_ERROR(get_logger(), "Navigation returned unknown state");
+                                finish(false, 0.0, "Navigation returned unknown state");
                                 break;
                         }
                         return;                  
@@ -187,7 +189,7 @@ int main(int argc, char ** argv) {
 
     node->set_parameter(rclcpp::Parameter("action_name", "move_to_waypoint_2"));
     node->trigger_transition(lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE);
-    node->trigger_transition(lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE);
+    //node->trigger_transition(lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE);
 
     rclcpp::spin(node->get_node_base_interface());
 

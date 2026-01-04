@@ -72,22 +72,22 @@ class Rotation : public plansys2::ActionExecutorClient {
             for (const auto & marker : msg->markers) {
                 int marker_id = static_cast<int>(marker.marker_id);
 
-                //RCLCPP_INFO(this->get_logger(), "MARKER ID %d", marker_id);     
+                //RCLCPP_INFO(this->get_logger(), "Marker id %d", marker_id);    
 
-                if (!request_sent) {
+                if (!this->request_sent) {
                     auto request = std::make_shared<marker_service_pkg::srv::StoreMarkers::Request>();
                     request->marker_id = marker_id;
                     request->marker = waypoint;
 
                     try {
-                        request_sent = true;
+                        this->request_sent = true;
                         auto result_future = store_client->async_send_request(request,
                             [this](rclcpp::Client<marker_service_pkg::srv::StoreMarkers>::SharedFuture response) {
-                                RCLCPP_INFO(this->get_logger(), "Service response received: %zu markers stored", response.get()->markers_id.size());
+                                RCLCPP_INFO(this->get_logger(), "Service request received");
                             });
                     } catch (const std::exception & e) {
                         RCLCPP_ERROR(this->get_logger(), "Failed to call store service: %s", e.what());
-                        request_sent = false;
+                        this->request_sent = false;
                     }   
                 }
             }
@@ -97,6 +97,7 @@ class Rotation : public plansys2::ActionExecutorClient {
             static bool rotating = false;               // STATIC fa in modo di far rimanere la variabile tra una chiamata e l'altra
             static float cumulative_rotation = 0.0;
             static float last_yaw = 0.0;
+            static geometry_msgs::msg::Twist twist;
             
             auto args = get_arguments();
             if (args.size() < 2) {
@@ -105,10 +106,10 @@ class Rotation : public plansys2::ActionExecutorClient {
                 return;
             }
             // To reset and allow to send the makrker id each time the robot approches a new marker
-            if (waypoint != args[1]) {
-                request_sent = false;
+            if (this->waypoint != args[1]) {
+                this->request_sent = false;
             }
-            waypoint = args[1];
+            this->waypoint = args[1];
 
             if (std::isnan(yaw)) {
                 RCLCPP_INFO(this->get_logger(), "Waiting for odom");
@@ -120,11 +121,9 @@ class Rotation : public plansys2::ActionExecutorClient {
                 rotating = true;
                 cumulative_rotation = 0.0;
                 last_yaw = yaw;
-                RCLCPP_INFO(this->get_logger(), "Rotation started");
+                twist.angular.z = 0.5;
+                RCLCPP_INFO(this->get_logger(), "Rotation over waypoint %s started", this->waypoint.c_str());
             }
-
-            geometry_msgs::msg::Twist twist;
-            twist.angular.z = 0.5;
             vel_pub->publish(twist);
 
             float delta = normalize_angle(yaw - last_yaw);
@@ -133,18 +132,23 @@ class Rotation : public plansys2::ActionExecutorClient {
 
             progress_ = std::min(1.0f, cumulative_rotation / float(2.0 * M_PI));
             //progress_ = std::round(progress_ * 100.0f) / 100.0f;
-            send_feedback(progress_, "Rotating");
+            send_feedback(progress_, "Rotating for id scanning over the waypoint");
             if (cumulative_rotation >= 2.0 * M_PI) {
-                send_feedback(progress_, "Rotating");
                 twist.angular.z = 0.0;
                 vel_pub->publish(twist);
 
-                finish(true, 1.0, "Rotation completed");
                 rotating = false;
                 cumulative_rotation = 0.0;
                 progress_ = 0.0;
 
-                RCLCPP_INFO(this->get_logger(), "Rotation over %s completed!", waypoint.c_str());
+                if (!this->request_sent) {
+                    RCLCPP_INFO(this->get_logger(), "Rotation over the waypoint %s for id scanning not completed", waypoint.c_str());
+                    finish(false, 0.0, "Rotation for id scanning not completed");
+                    return;
+                }
+                
+                RCLCPP_INFO(this->get_logger(), "Rotation over the waypoint %s for id scanning completed", waypoint.c_str());
+                finish(true, 1.0, "Rotation completed");
             }
         }
 };
@@ -155,7 +159,7 @@ int main(int argc, char ** argv) {
 
     node->set_parameter(rclcpp::Parameter("action_name", "rotation"));
     node->trigger_transition(lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE);
-    node->trigger_transition(lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE);
+    //node->trigger_transition(lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE);
 
     rclcpp::spin(node->get_node_base_interface());
     rclcpp::shutdown();
