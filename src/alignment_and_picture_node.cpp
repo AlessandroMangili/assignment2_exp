@@ -62,7 +62,7 @@ class Alignment : public plansys2::ActionExecutorClient {
     private:
         float progress_;
         float yaw;
-        const int REQUIRED_CONSECUTIVE = 2;
+        const int REQUIRED_CONSECUTIVE = 3;
         bool get_markers;
         std::map<int, int> centered_counts;
         cv::Mat cv_image;
@@ -99,11 +99,9 @@ class Alignment : public plansys2::ActionExecutorClient {
             try {
                 cv::namedWindow("Marker-" + std::to_string(marker_id), cv::WINDOW_AUTOSIZE);
 
-                // ArUco dictionary e parametri
                 cv::Ptr<cv::aruco::Dictionary> aruco_dict = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_ARUCO_ORIGINAL);
                 cv::Ptr<cv::aruco::DetectorParameters> parameters = cv::aruco::DetectorParameters::create();
 
-                // detectMarkers
                 std::vector<std::vector<cv::Point2f>> corners, rejected;
                 std::vector<int> ids;
                 cv::aruco::detectMarkers(cv_image, aruco_dict, corners, ids, parameters, rejected);
@@ -211,6 +209,13 @@ class Alignment : public plansys2::ActionExecutorClient {
         
         void do_work() override {
             cv::waitKey(1);
+            auto args = get_arguments();
+            if (args.size() < 2) {
+                RCLCPP_ERROR(get_logger(), "Not enough arguments for alignment");
+                finish(false, 0.0, "Insufficient arguments");
+                return;
+            }
+            
             static bool get_markers = false;
             if (!get_markers) {
                 if (!store_client->wait_for_service(2s)) {
@@ -232,19 +237,14 @@ class Alignment : public plansys2::ActionExecutorClient {
                 get_markers = true;
             }
 
-            auto args = get_arguments();
-            if (args.size() < 2) {
-                RCLCPP_ERROR(get_logger(), "Not enough arguments for alignment");
-                finish(false, 0.0, "Insufficient arguments");
-                return;
-            }
+            
 
             if (markers.empty()) {
                 RCLCPP_WARN(get_logger(), "Failed to get the lowest marker id");
                 return;
             }
 
-            static bool rotating = false;               // STATIC fa in modo di far rimanere la variabile tra una chiamata e l'altra
+            static bool rotating = false;
             static float cumulative_rotation = 0.0;
             static float last_yaw = 0.0;
             static geometry_msgs::msg::Twist twist;

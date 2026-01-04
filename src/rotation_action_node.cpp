@@ -45,14 +45,7 @@ class Rotation : public plansys2::ActionExecutorClient {
             store_client = this->create_client<marker_service_pkg::srv::StoreMarkers>(
                 "/store_markers"
             );
-            request = std::make_shared<marker_service_pkg::srv::StoreMarkers::Request>();
         }
-
-        /*rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn on_activate(const rclcpp_lifecycle::State &previous_state) {
-            RCLCPP_INFO(get_logger(), "Configuring Rotation node");
-            progress_ = 0.0;
-            return ActionExecutorClient::on_activate(previous_state);
-        }*/
 
     private:
         float progress_;
@@ -63,7 +56,6 @@ class Rotation : public plansys2::ActionExecutorClient {
         std::string waypoint;
         
         rclcpp::Client<marker_service_pkg::srv::StoreMarkers>::SharedPtr store_client;
-        std::shared_ptr<marker_service_pkg::srv::StoreMarkers::Request> request;
         bool request_sent;
 
 
@@ -83,6 +75,7 @@ class Rotation : public plansys2::ActionExecutorClient {
                 //RCLCPP_INFO(this->get_logger(), "MARKER ID %d", marker_id);     
 
                 if (!request_sent) {
+                    auto request = std::make_shared<marker_service_pkg::srv::StoreMarkers::Request>();
                     request->marker_id = marker_id;
                     request->marker = waypoint;
 

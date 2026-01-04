@@ -55,6 +55,13 @@ class MoveAction : public plansys2::ActionExecutorClient {
         }
 
         void do_work() override {
+            auto args = get_arguments();
+            if (args.size() < 3) {
+                RCLCPP_ERROR(get_logger(), "Not enough arguments for move action");
+                finish(false, 0.0, "Insufficient arguments");
+                return;
+            }
+
             static bool get_markers = false;
             if (!get_markers) {
                 if (!store_client->wait_for_service(2s)) {
@@ -76,22 +83,15 @@ class MoveAction : public plansys2::ActionExecutorClient {
                 get_markers = true;
             }
 
-            auto args = get_arguments();
-            if (args.size() < 3) {
-                RCLCPP_ERROR(get_logger(), "Not enough arguments for move action");
-                finish(false, 0.0, "Insufficient arguments");
-                return;
-            }
-
-
             if (markers.empty()) {
                 RCLCPP_WARN(get_logger(), "Failed to get the lowest marker id");
                 return;
             }
 
-            static double goal_x, goal_y;         
+            static double goal_x, goal_y;   
             if (!goal_sent) {
                 auto item = markers.begin(); 
+                RCLCPP_WARN(get_logger(), "MAKRER %s - %d", item->second.c_str(), item->first);
                 wp_to_navigate = item->second;
 
                 if (!nav2_client->wait_for_action_server(1s)) {
@@ -123,6 +123,8 @@ class MoveAction : public plansys2::ActionExecutorClient {
                 goal_pose.pose.position.y = goal_y;
                 goal_pose.pose.orientation.w = 1.0;
 
+                RCLCPP_WARN(get_logger(), "GOAL %f- %f", goal_x, goal_y);
+
                 RCLCPP_INFO(get_logger(), "Moving to waypoint: %s", wp_to_navigate.c_str());
 
                 auto goal_msg = nav2_msgs::action::NavigateToPose::Goal();
@@ -131,17 +133,29 @@ class MoveAction : public plansys2::ActionExecutorClient {
                 rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SendGoalOptions send_goal_options;
                 send_goal_options.result_callback =
                     [this](const rclcpp_action::ClientGoalHandle<nav2_msgs::action::NavigateToPose>::WrappedResult & result) {
-                        if (result.code != rclcpp_action::ResultCode::SUCCEEDED) {
-                            RCLCPP_ERROR(get_logger(), "Navigation failed: %s", this->wp_to_navigate.c_str());
-                            finish(true, 1.0, "Navigation failed");
-                        } else if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
-                            goal_sent= false;
-                            progress_ = 1.0;
-                            markers.erase(markers.begin());
-                            send_feedback(progress_, "Moving to " + wp_to_navigate);
-                            RCLCPP_INFO(get_logger(), "Reached waypoint: %s", this->wp_to_navigate.c_str());
-                            finish(true, 1.0, "Navigation completed");
+                        switch (result.code) {
+                            case rclcpp_action::ResultCode::SUCCEEDED:
+                                goal_sent = false;
+                                progress_ = 1.0;
+                                markers.erase(markers.begin());
+                                send_feedback(progress_, "Moving to " + wp_to_navigate);
+                                RCLCPP_INFO(get_logger(), "Reached waypoint: %s", this->wp_to_navigate.c_str());
+                                finish(true, 1.0, "Navigation completed");
+                                break;
+                            case rclcpp_action::ResultCode::ABORTED:
+                                RCLCPP_WARN(get_logger(), "Nav2 aborted goal, waiting distance check");
+                                goal_sent = false;
+                                RCLCPP_ERROR(get_logger(), "Navigation failed: %s", this->wp_to_navigate.c_str());
+                                finish(false, 0.0, "Navigation failed");
+                                break;
+                            default:
+                                RCLCPP_WARN(get_logger(), "Nav2 returned unknown state");
+                                goal_sent = false;
+                                RCLCPP_ERROR(get_logger(), "Navigation failed: %s", this->wp_to_navigate.c_str());
+                                finish(false, 0.0, "Navigation failed");
+                                break;
                         }
+                        return;                  
                     };
 
                 nav2_client->async_send_goal(goal_msg, send_goal_options);
@@ -154,16 +168,15 @@ class MoveAction : public plansys2::ActionExecutorClient {
             double total_dist = std::hypot(goal_x - start_x, goal_y - start_y);
             double rem_dist   = std::hypot(goal_x - current_pos.position.x, goal_y - current_pos.position.y);
             progress_ = total_dist > 0.0 ? 1.0 - std::min(rem_dist / total_dist, 1.0) : 1.0;
-
             send_feedback(progress_, "Moving to " + wp_to_navigate);
-            if (rem_dist < 0.25) {
+            /*if (rem_dist < 0.25) {
                 goal_sent= false;
                 progress_ = 1.0;
                 markers.erase(markers.begin());
                 send_feedback(progress_, "Moving to " + wp_to_navigate);
                 RCLCPP_INFO(get_logger(), "Reached waypoint: %s", wp_to_navigate.c_str());
                 finish(true, 1.0, "Move completed");
-            }
+            }*/
             rclcpp::spin_some(nav2_node);
         }
 };

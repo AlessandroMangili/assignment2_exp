@@ -6,6 +6,13 @@ import os
 
 def generate_launch_description():
 
+    store_markers_service = Node(
+        package='marker_service_pkg',
+        executable='store_markers_service',
+        name='store_markers_service',
+        output='screen'
+    )
+
     # 1. Spawn robot
     spawn_robot_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -34,7 +41,7 @@ def generate_launch_description():
             os.path.join(
                 get_package_share_directory('ros2_navigation'),
                 'launch',
-                'mapping.launch.py'
+                'localization.launch.py'
             )
         )
     )
@@ -70,45 +77,45 @@ def generate_launch_description():
         output='screen'
     )
 
-    # Sequenza con timer per garantire che ogni launch parta dopo il precedente
-    sequence = TimerAction(
-        period=0.5,  # piccolo delay iniziale
-        actions=[
-            spawn_robot_launch,
-            LogInfo(msg='spawn_robot launched, scheduling aruco_tracker in 5s'),
-            TimerAction(
-                period=5.0,
-                actions=[
-                    aruco_tracker_launch,
-                    LogInfo(msg='aruco_tracker launched, scheduling load_map in 2s'),
-                    TimerAction(
-                        period=2.0,
-                        actions=[
-                            loading_map,
-                            LogInfo(msg='map loading launched, scheduling navigation in 2s'),
-                            TimerAction(
-                                period=2.0,
-                                actions=[
-                                    navigation_launch,
-                                    LogInfo(msg='navigation launched, scheduling plan generation in 4s'),
-                                    TimerAction(
-                                        period=4.0,
-                                        actions=[
-                                            generating_plan_launch,
-                                            LogInfo(msg='plan generation launched, scheduling execution in 3s'),
-                                            TimerAction(
-                                                period=3.0,
-                                                actions=[execute_plan]
-                                            )
-                                        ]
-                                    )
-                                ]
-                            )
-                        ]
-                    )
-                ]
-            )
-        ]
-    )
+    return LaunchDescription([
+        store_markers_service,
+        aruco_tracker_launch,
+        spawn_robot_launch,
+        LogInfo(msg='store_markers_service, aruco_tracker and spawn robot'),
 
-    return LaunchDescription([sequence])
+        TimerAction(
+            period=5.0,
+            actions=[
+                LogInfo(msg='Starting localization'),
+                loading_map
+            ]
+        ),
+
+        # after 11s start navigation (give time to localization)
+        TimerAction(
+            period=7.0,
+            actions=[
+                LogInfo(msg='Starting navigation'),
+                navigation_launch
+            ]
+        ),
+
+        # after 15s start plan generation
+        TimerAction(
+            period=10.0,
+            actions=[
+                LogInfo(msg='Starting plan generation'),
+                generating_plan_launch
+            ]
+        ),
+
+        # after 18s execute the plan (choose one of the options below)
+        TimerAction(
+            period=14.0,
+            actions=[
+                LogInfo(msg='Executing plan (node)'),
+                execute_plan_node,   # preferito: lo esegue come node normale
+                # execute_plan_new_term,  # alternativa: esegui in nuovo terminale se preferisci
+            ]
+        ),
+    ])

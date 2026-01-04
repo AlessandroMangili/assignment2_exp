@@ -24,13 +24,13 @@ def generate_launch_description():
     
     declare_model_file_cmd = DeclareLaunchArgument(
         'model_file',
-        default_value=os.path.join(interface_dir, "domain", "assignment2_domain.pddl"),
+        default_value=os.path.join(interface_dir, "domain", "domain.pddl"),
         description='PDDL Model file'
     )
 
     declare_problem_file_cmd = DeclareLaunchArgument(
         'problem_file', 
-        default_value=os.path.join(interface_dir, "domain", "assignment2_problem.pddl"),
+        default_value=os.path.join(interface_dir, "domain", "problem.pddl"),
         description='PDDL Problem file')
         
     declare_namespace_cmd = DeclareLaunchArgument(
@@ -192,8 +192,8 @@ def generate_launch_description():
     ld.add_action(executor_cmd)
     ld.add_action(lifecycle_manager_cmd)
     
-    """ld.add_action(move_cmd)
-    ld.add_action(rotation_cmd)"""
+    ld.add_action(move_cmd)
+    ld.add_action(rotation_cmd)
     ld.add_action(check_end_cmd)
 
     ld.add_action(move_2_cmd)
