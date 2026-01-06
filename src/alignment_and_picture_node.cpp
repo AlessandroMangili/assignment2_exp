@@ -130,8 +130,8 @@ class Alignment : public plansys2::ActionExecutorClient {
 
                         cv::circle(cv_image, center_int, radius, cv::Scalar(0,0,255), 2);
                         cv::circle(cv_image, center_int, 3, cv::Scalar(0,0,255), -1);
-                        cv::putText(cv_image, "marker_id=" + std::to_string(current_marker_id),
-                                    cv::Point(center_int.x, center_int.y),
+                        cv::putText(cv_image, "marker id=" + std::to_string(current_marker_id),
+                                    cv::Point(center_int.x - 20, center_int.y + 40),
                                     cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0,255,0), 2, cv::LINE_AA);
                     }
                 }

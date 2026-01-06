@@ -7,7 +7,7 @@ This second assignment of the experimental course aims to navigate a mobile robo
 The waypoints position are:
 1. x1 = -6.0, y1= -6.0 **due to detection marker error, we changed to** $\Longrightarrow$ x1 = -6.8, y1= -8.0
 2. x2 = -6.0, y2 = 6.0;
-3. x3= 6.0, y3 = -6.0; **due to detection marker error, we changed to** $\Longrightarrow$ x1 = -6.5, y1= -8.0
+3. x3= 6.0, y3 = -6.0; **due to detection marker error, we changed to** $\Longrightarrow$ x3 = -6.5, y1= -8.0
 4. x4 = 6.0, y4 = 6.0
 
 The assignment is divided into two main parts:
@@ -16,6 +16,10 @@ The assignment is divided into two main parts:
 2. Starting from the marker with the lowest ID, navigate to the corresponding waypoint, center the marker in the camera view, take a picture, and publish the image with the circled marker on a custom topic. Repeat this process for each remaining marker in order of ascending ID.
 
 The robot's behavior and action sequence are generated using a PDDL model, where PlanSys2 computes the plan and orchestrates the sequence of actions through the ROS 2 nodes created for this assignment.
+
+## Simulation recording
+
+
 
 ## Setup
 
